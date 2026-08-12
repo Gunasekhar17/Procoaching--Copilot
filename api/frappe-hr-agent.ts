@@ -1,5 +1,5 @@
 import { corsHeaders, json } from "./_lib/cors";
-import { callOpenAI, firstToolCallArgs, messageText, OpenAIError, type ChatMessage } from "./_lib/openai";
+import { callClaude, firstToolCallArgs, messageText, ClaudeError, type ChatMessage } from "./_lib/anthropic";
 
 export const config = { runtime: "edge" };
 
@@ -216,7 +216,7 @@ If you can't determine what data to query or how to map the file, set action to 
 
     let parseData;
     try {
-      parseData = await callOpenAI({
+      parseData = await callClaude({
         messages: parseMessages,
         tools: [
           {
@@ -254,7 +254,7 @@ If you can't determine what data to query or how to map the file, set action to 
         toolChoice: "auto",
       });
     } catch (e) {
-      if (e instanceof OpenAIError) return json({ error: e.message }, e.status);
+      if (e instanceof ClaudeError) return json({ error: e.message }, e.status);
       throw e;
     }
 
@@ -341,7 +341,7 @@ If you can't determine what data to query or how to map the file, set action to 
       ];
       let summary = `Checked ${file.rows.length} rows against ${plan.doctype}: ${matched} matched, ${mismatched.length} field mismatch(es), ${missingInFrappe.length} not found in Frappe.`;
       try {
-        const answerData = await callOpenAI({ messages: summaryMessages });
+        const answerData = await callClaude({ messages: summaryMessages });
         summary = messageText(answerData) || summary;
       } catch {
         /* fall back to the plain summary above */
@@ -562,7 +562,7 @@ ${JSON.stringify(rawData, null, 2).slice(0, 4000)}`,
 
     let humanAnswer: string;
     try {
-      const answerData = await callOpenAI({ messages: answerMessages });
+      const answerData = await callClaude({ messages: answerMessages });
       humanAnswer = messageText(answerData) || "Here's what I found.";
     } catch {
       if (Array.isArray(rawData)) {
