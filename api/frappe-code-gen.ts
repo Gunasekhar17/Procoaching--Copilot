@@ -1,5 +1,5 @@
 import { corsHeaders, json } from "./_lib/cors";
-import { callOpenAI, firstToolCallArgs, OpenAIError, type ChatMessage } from "./_lib/openai";
+import { callClaude, firstToolCallArgs, ClaudeError, type ChatMessage } from "./_lib/anthropic";
 
 export const config = { runtime: "edge" };
 
@@ -83,7 +83,7 @@ export default async function handler(req: Request): Promise<Response> {
 
     let aiData;
     try {
-      aiData = await callOpenAI({
+      aiData = await callClaude({
         messages,
         tools: [
           {
@@ -120,7 +120,7 @@ export default async function handler(req: Request): Promise<Response> {
         toolChoice: { type: "function", function: { name: "generate_code" } },
       });
     } catch (e) {
-      if (e instanceof OpenAIError) return json({ error: e.message }, e.status);
+      if (e instanceof ClaudeError) return json({ error: e.message }, e.status);
       throw e;
     }
 
