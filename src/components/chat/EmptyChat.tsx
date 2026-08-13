@@ -1,6 +1,6 @@
 import {
-  Bot, Users, ShoppingCart, Package, Receipt, DollarSign, BarChart3,
-  HelpCircle, TrendingUp, Boxes,
+  Bot, Users, CalendarClock, Receipt, Clock, Briefcase,
+  HelpCircle, BarChart3,
   type LucideIcon,
 } from "lucide-react";
 import type { SystemType } from "@/hooks/useConnection";
@@ -17,12 +17,12 @@ interface Suggestion {
 }
 
 const suggestions: Suggestion[] = [
-  { icon: Users, label: "How many customers?", command: "How many customers do I have?" },
-  { icon: ShoppingCart, label: "Pending orders", command: "What are my pending sales orders?" },
-  { icon: DollarSign, label: "This month's sales", command: "What was my total sales this month?" },
-  { icon: Boxes, label: "Low stock items", command: "Show me low stock items" },
-  { icon: Receipt, label: "Unpaid invoices", command: "Show me unpaid sales invoices" },
-  { icon: TrendingUp, label: "Top customers", command: "Who are my top 5 customers by revenue?" },
+  { icon: Users, label: "How many employees?", command: "How many employees do I have?" },
+  { icon: CalendarClock, label: "Today's shift roster", command: "Who's on shift today?" },
+  { icon: Clock, label: "Pending timesheets", command: "Show me pending timesheets" },
+  { icon: Receipt, label: "Expense claims to approve", command: "What expense claims are pending approval?" },
+  { icon: CalendarClock, label: "Who's on leave today?", command: "Which employees are on leave today?" },
+  { icon: Briefcase, label: "Open job openings", command: "What job openings are currently open?" },
 ];
 
 const disconnectedSuggestions: Suggestion[] = [
@@ -40,12 +40,12 @@ const EmptyChat = ({ onAction, systemType }: EmptyChatProps) => {
         <Bot className="h-8 w-8 text-primary" />
       </div>
       <h2 className="text-xl font-semibold mb-2">
-        ERPNext <span className="text-gradient">Q&A</span>
+        HR <span className="text-gradient">Q&A</span>
       </h2>
       <p className="text-sm text-muted-foreground mb-8 text-center max-w-md">
         {isConnected
-          ? "Ask me anything about your business data. I'll query your ERPNext system and give you clear answers."
-          : "Connect your ERPNext site to start asking questions about your business data."}
+          ? "Ask me anything about your HR data. I'll query your Frappe HRMS site and give you clear answers."
+          : "Connect your Frappe HRMS site to start asking questions about your HR data."}
       </p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-lg">
         {items.map((s) => (
