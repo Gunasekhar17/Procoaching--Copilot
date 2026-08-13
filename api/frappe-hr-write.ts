@@ -102,10 +102,10 @@ export default async function handler(req: Request): Promise<Response> {
     if (!resp.ok) {
       let errorMessage = parseFrappeError(text, resp.status);
       if (errorMessage.includes("decrypt key") || errorMessage.includes("Encryption key is invalid")) {
-        errorMessage = "⚠️ Invalid API credentials.";
+        errorMessage = "Invalid API credentials.";
       }
       if (resp.status === 403 && usingSession) {
-        errorMessage = "⚠️ Your session has expired. Please reconnect in Settings.";
+        errorMessage = "Your session has expired. Please reconnect in Settings.";
       }
       return json({ success: false, error: errorMessage });
     }
