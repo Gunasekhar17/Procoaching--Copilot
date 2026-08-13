@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import { Bot, Sun, Moon, MessageSquare, Plus, Home } from "lucide-react";
+import { Bot, Sun, Moon, MessageSquare, Plus, Home, User, ArrowRight, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { useTheme } from "@/hooks/useTheme";
 import { useChatStore, type ChatMessage, type UploadedFileData, type ImportPreviewData, type ImportExecuteResult, type WritePreviewData, type WriteExecuteResult } from "@/hooks/useChatStore";
@@ -29,6 +29,7 @@ const Index = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [started, setStarted] = useState(false);
+  const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = useCallback(() => {
@@ -230,40 +231,157 @@ const Index = () => {
     [activeChatId, createChat, addMessage, updateLastAgentMessage, connection, chats, buildAuthPayload]
   );
 
-  // Home page: a centered card. Clicking "Try it" launches the full app.
+  // When an example chip on the home page is clicked, we switch to the app
+  // and send its prompt on the next render, once the chat view exists.
+  useEffect(() => {
+    if (started && pendingPrompt) {
+      const prompt = pendingPrompt;
+      setPendingPrompt(null);
+      executeCommand(prompt);
+    }
+  }, [started, pendingPrompt, executeCommand]);
+
+  const openWithPrompt = (prompt: string) => {
+    setPendingPrompt(prompt);
+    setStarted(true);
+  };
+
+  // Home page: nav, hero, and a live-looking preview of the product itself.
   if (!started) {
+    const examples = [
+      "How many employees are in Production?",
+      "Create a new employee named Priya Sharma",
+      "Show pending leave applications",
+      "Import my employees from a CSV",
+    ];
+
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-background px-4">
-        <div className="w-full max-w-md rounded-2xl border border-border bg-card p-8 text-center shadow-xl animate-fade-in">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
-            <Bot className="h-7 w-7 text-primary" />
+      <div className="min-h-screen w-full bg-background">
+        {/* Nav */}
+        <nav className="flex items-center justify-between border-b border-border px-6 py-4">
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+              <Bot className="h-4 w-4 text-primary" />
+            </div>
+            <span className="text-sm font-semibold">
+              Frappe HR <span className="text-gradient">Copilot</span>
+            </span>
           </div>
-          <h1 className="mt-4 text-xl font-semibold">
-            Frappe HR <span className="text-gradient">Copilot</span>
+          <div className="flex items-center gap-3">
+            <span className="hidden items-center gap-1.5 sm:flex">
+              <span className={`h-1.5 w-1.5 rounded-full ${isConnected ? "bg-success" : "bg-destructive"}`} />
+              <span className={`text-[11px] font-medium ${isConnected ? "text-success" : "text-muted-foreground"}`}>
+                {isConnected ? siteName : "Not connected"}
+              </span>
+            </span>
+            <button
+              onClick={() => setStarted(true)}
+              className="rounded-lg bg-primary px-3.5 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+            >
+              Try it
+            </button>
+          </div>
+        </nav>
+
+        {/* Hero */}
+        <section className="mx-auto max-w-2xl px-6 pt-16 pb-10 text-center sm:pt-20">
+          <div className="mx-auto mb-5 inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-[11px] font-medium text-muted-foreground">
+            <Sparkles className="h-3 w-3 text-amber-500" />
+            Built for Frappe and ERPNext
+          </div>
+          <h1 className="text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">
+            Query, create, and update Frappe records without opening a single form.
           </h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Ask questions, create records, and manage your Frappe data in plain English.
+          <p className="mt-4 text-sm text-muted-foreground sm:text-base">
+            Ask a question or describe a change in plain English. Frappe Copilot figures out the doctype, the
+            filters, and the fields, across HR, Sales, Stock, Accounting, and every module you have access to.
           </p>
-          <button
-            onClick={() => setStarted(true)}
-            className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-          >
-            Try it
-          </button>
-          <div className="mt-4 flex items-center justify-center gap-1.5 text-xs">
-            {isConnected ? (
-              <>
-                <div className="h-1.5 w-1.5 rounded-full bg-success" />
-                <span className="text-success">{siteName}</span>
-              </>
-            ) : (
-              <>
-                <div className="h-1.5 w-1.5 rounded-full bg-destructive" />
-                <span className="text-muted-foreground">Not connected yet, you can connect after opening</span>
-              </>
-            )}
+          <div className="mt-7 flex flex-col items-center gap-2 sm:flex-row sm:justify-center">
+            <button
+              onClick={() => setStarted(true)}
+              className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+            >
+              Try it
+              <ArrowRight className="h-4 w-4" />
+            </button>
+            <span className="text-xs text-muted-foreground">Just your Frappe site URL and an API key</span>
           </div>
-        </div>
+        </section>
+
+        {/* Live-looking product preview */}
+        <section className="mx-auto max-w-2xl px-6 pb-14">
+          <div className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <span className="text-[11px] font-medium text-muted-foreground">Live preview</span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                Example
+              </span>
+            </div>
+
+            {/* mock user message */}
+            <div className="flex flex-row-reverse items-start gap-2.5">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                <User className="h-3.5 w-3.5" />
+              </div>
+              <div className="rounded-2xl rounded-br-md bg-primary px-3.5 py-2 text-xs text-primary-foreground">
+                How many employees are in Production?
+              </div>
+            </div>
+
+            {/* mock agent response */}
+            <div className="mt-3 flex items-start gap-2.5">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                <Bot className="h-3.5 w-3.5" />
+              </div>
+              <div className="max-w-[85%] space-y-2">
+                <div className="rounded-2xl rounded-bl-md bg-[hsl(var(--chat-agent))] px-3.5 py-2 text-xs text-[hsl(var(--chat-agent-foreground))]">
+                  There are 8 employees in Production.
+                </div>
+                <div className="overflow-hidden rounded-lg border border-border">
+                  <table className="w-full text-[10px]">
+                    <thead>
+                      <tr className="border-b border-border bg-muted/50">
+                        <th className="px-2.5 py-1.5 text-left font-mono font-normal text-muted-foreground">name</th>
+                        <th className="px-2.5 py-1.5 text-left font-mono font-normal text-muted-foreground">employee name</th>
+                        <th className="px-2.5 py-1.5 text-left font-mono font-normal text-muted-foreground">department</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[
+                        ["HR-EMP-00002", "Ravi", "Production - E"],
+                        ["HR-EMP-00003", "Priya", "Production - E"],
+                        ["HR-EMP-00010", "Vikram", "Production - E"],
+                      ].map((row) => (
+                        <tr key={row[0]} className="border-b border-border/50 last:border-0">
+                          {row.map((cell, i) => (
+                            <td key={i} className="px-2.5 py-1.5 font-mono text-muted-foreground">{cell}</td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <div className="border-t border-border bg-muted/30 px-2.5 py-1 text-[9px] text-muted-foreground">
+                    8 records
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Example chips */}
+          <div className="mt-4 flex flex-wrap justify-center gap-2">
+            {examples.map((ex) => (
+              <button
+                key={ex}
+                onClick={() => openWithPrompt(ex)}
+                className="rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground hover:border-primary/40 hover:text-foreground transition-colors"
+              >
+                {ex}
+              </button>
+            ))}
+          </div>
+        </section>
       </div>
     );
   }
