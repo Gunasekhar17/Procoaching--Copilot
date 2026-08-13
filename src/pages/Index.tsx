@@ -249,7 +249,7 @@ const Index = () => {
   // Home page: nav, hero, and a live-looking preview of the product itself.
   if (!started) {
     const examples = [
-      "How many employees are in my system?",
+      "How many employees are in Production?",
       "Create a new employee named Priya Sharma",
       "Show pending leave applications",
       "Import my employees from a CSV",
@@ -294,7 +294,7 @@ const Index = () => {
           </h1>
           <p className="mt-4 text-sm text-muted-foreground sm:text-base">
             Ask a question or describe a change in plain English. Frappe Copilot figures out the doctype, the
-            filters, and the fields, across HR, Shifts, Roster and every module you have access to.
+            filters, and the fields, across HR, Sales, Stock, Accounting, and every module you have access to.
           </p>
           <div className="mt-7 flex flex-col items-center gap-2 sm:flex-row sm:justify-center">
             <button
@@ -325,7 +325,7 @@ const Index = () => {
                 <User className="h-3.5 w-3.5" />
               </div>
               <div className="rounded-2xl rounded-br-md bg-primary px-3.5 py-2 text-xs text-primary-foreground">
-                How many employees are in my system?
+                How many employees are in Production?
               </div>
             </div>
 
@@ -336,7 +336,7 @@ const Index = () => {
               </div>
               <div className="max-w-[85%] space-y-2">
                 <div className="rounded-2xl rounded-bl-md bg-[hsl(var(--chat-agent))] px-3.5 py-2 text-xs text-[hsl(var(--chat-agent-foreground))]">
-                  There are 8 employees in your system.
+                  There are 8 employees in Production.
                 </div>
                 <div className="overflow-hidden rounded-lg border border-border">
                   <table className="w-full text-[10px]">
