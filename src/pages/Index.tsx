@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import { Bot, Menu, Sun, Moon, MessageSquare, Plus } from "lucide-react";
+import { Bot, Menu, Sun, Moon, MessageSquare, Plus, Maximize2, Minimize2, X } from "lucide-react";
 import { toast } from "sonner";
 import { useTheme } from "@/hooks/useTheme";
 import { useChatStore, type ChatMessage, type UploadedFileData, type ImportPreviewData, type ImportExecuteResult, type WritePreviewData, type WriteExecuteResult } from "@/hooks/useChatStore";
@@ -28,6 +28,8 @@ const Index = () => {
 
   const [isLoading, setIsLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [widgetOpen, setWidgetOpen] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = useCallback(() => {
@@ -229,8 +231,35 @@ const Index = () => {
     [activeChatId, createChat, addMessage, updateLastAgentMessage, connection, chats, buildAuthPayload]
   );
 
+  // Collapsed: just the floating launcher button, bottom-right.
+  if (!widgetOpen) {
+    return (
+      <div className="fixed bottom-6 right-6 z-50">
+        <button
+          onClick={() => setWidgetOpen(true)}
+          title="Open Frappe Copilot"
+          className="relative flex h-16 w-16 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl shadow-primary/25 transition-transform hover:scale-105 active:scale-95"
+        >
+          <Bot className="h-7 w-7" />
+          <span
+            className={`absolute -top-0.5 -right-0.5 h-3.5 w-3.5 rounded-full ring-2 ring-background ${
+              isConnected ? "bg-success" : "bg-destructive"
+            }`}
+          />
+        </button>
+      </div>
+    );
+  }
+
+  // Open: a floating panel by default, or a near-fullscreen panel when expanded.
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-background">
+    <div
+      className={`fixed z-50 flex flex-col overflow-hidden rounded-2xl border border-border bg-background shadow-2xl transition-all duration-200 ${
+        expanded
+          ? "inset-4 sm:inset-8"
+          : "bottom-6 right-6 h-[min(700px,85vh)] w-[min(440px,92vw)]"
+      }`}
+    >
       {/* Chat history overlay */}
       <ChatSidebar
         chats={chats}
@@ -243,7 +272,7 @@ const Index = () => {
         onClose={() => setSidebarOpen(false)}
       />
 
-      {/* Main Area - Full width */}
+      {/* Main Area */}
       <div className="flex flex-1 flex-col min-w-0">
         {/* Header */}
         <header className="flex items-center gap-3 border-b border-border bg-background/80 backdrop-blur-sm px-4 py-3 shrink-0">
@@ -294,6 +323,22 @@ const Index = () => {
               title="Toggle theme"
             >
               {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </button>
+            {/* Expand / shrink the floating panel */}
+            <button
+              onClick={() => setExpanded((e) => !e)}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent transition-colors"
+              title={expanded ? "Shrink" : "Expand"}
+            >
+              {expanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            </button>
+            {/* Minimize back to the launcher button */}
+            <button
+              onClick={() => setWidgetOpen(false)}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent transition-colors"
+              title="Minimize"
+            >
+              <X className="h-4 w-4" />
             </button>
           </div>
         </header>
