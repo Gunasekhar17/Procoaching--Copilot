@@ -1,4 +1,5 @@
 import { corsHeaders, json } from "./_lib/cors";
+import { isRestrictedDoctype, isCancelAttempt, restrictedDoctypeError, CANCEL_ATTEMPT_ERROR } from "./_lib/permissions";
 
 export const config = { runtime: "edge" };
 
@@ -71,6 +72,12 @@ export default async function handler(req: Request): Promise<Response> {
     }
     if (record_action === "update" && !docname) {
       return json({ success: false, error: "Missing target record for update." }, 400);
+    }
+    if (isRestrictedDoctype(doctype)) {
+      return json({ success: false, error: restrictedDoctypeError(doctype) }, 403);
+    }
+    if (isCancelAttempt(field_values)) {
+      return json({ success: false, error: CANCEL_ATTEMPT_ERROR }, 403);
     }
 
     const baseUrl = site_url.replace(/\/$/, "");
