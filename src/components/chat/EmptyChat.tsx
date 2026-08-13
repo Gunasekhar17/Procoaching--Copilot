@@ -21,8 +21,6 @@ const suggestions: Suggestion[] = [
   { icon: CalendarClock, label: "Today's shift roster", command: "Who's on shift today?" },
   { icon: Clock, label: "Pending timesheets", command: "Show me pending timesheets" },
   { icon: Receipt, label: "Expense claims to approve", command: "What expense claims are pending approval?" },
-  { icon: CalendarClock, label: "Who's on leave today?", command: "Which employees are on leave today?" },
-  { icon: Briefcase, label: "Open job openings", command: "What job openings are currently open?" },
 ];
 
 const disconnectedSuggestions: Suggestion[] = [
