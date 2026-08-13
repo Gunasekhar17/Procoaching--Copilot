@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import { Bot, Menu, Sun, Moon, MessageSquare, Plus, Maximize2, Minimize2, X } from "lucide-react";
+import { Bot, Sun, Moon, MessageSquare, Plus, Home } from "lucide-react";
 import { toast } from "sonner";
 import { useTheme } from "@/hooks/useTheme";
 import { useChatStore, type ChatMessage, type UploadedFileData, type ImportPreviewData, type ImportExecuteResult, type WritePreviewData, type WriteExecuteResult } from "@/hooks/useChatStore";
@@ -28,8 +28,7 @@ const Index = () => {
 
   const [isLoading, setIsLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [widgetOpen, setWidgetOpen] = useState(false);
-  const [expanded, setExpanded] = useState(false);
+  const [started, setStarted] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = useCallback(() => {
@@ -231,35 +230,47 @@ const Index = () => {
     [activeChatId, createChat, addMessage, updateLastAgentMessage, connection, chats, buildAuthPayload]
   );
 
-  // Collapsed: just the floating launcher button, bottom-right.
-  if (!widgetOpen) {
+  // Home page: a centered card. Clicking "Try it" launches the full app.
+  if (!started) {
     return (
-      <div className="fixed bottom-6 right-6 z-50">
-        <button
-          onClick={() => setWidgetOpen(true)}
-          title="Open Frappe Copilot"
-          className="relative flex h-16 w-16 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl shadow-primary/25 transition-transform hover:scale-105 active:scale-95"
-        >
-          <Bot className="h-7 w-7" />
-          <span
-            className={`absolute -top-0.5 -right-0.5 h-3.5 w-3.5 rounded-full ring-2 ring-background ${
-              isConnected ? "bg-success" : "bg-destructive"
-            }`}
-          />
-        </button>
+      <div className="flex h-screen w-full items-center justify-center bg-background px-4">
+        <div className="w-full max-w-md rounded-2xl border border-border bg-card p-8 text-center shadow-xl animate-fade-in">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
+            <Bot className="h-7 w-7 text-primary" />
+          </div>
+          <h1 className="mt-4 text-xl font-semibold">
+            Frappe HR <span className="text-gradient">Copilot</span>
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Ask questions, create records, and manage your Frappe data in plain English.
+          </p>
+          <button
+            onClick={() => setStarted(true)}
+            className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+          >
+            Try it
+          </button>
+          <div className="mt-4 flex items-center justify-center gap-1.5 text-xs">
+            {isConnected ? (
+              <>
+                <div className="h-1.5 w-1.5 rounded-full bg-success" />
+                <span className="text-success">{siteName}</span>
+              </>
+            ) : (
+              <>
+                <div className="h-1.5 w-1.5 rounded-full bg-destructive" />
+                <span className="text-muted-foreground">Not connected yet, you can connect after opening</span>
+              </>
+            )}
+          </div>
+        </div>
       </div>
     );
   }
 
-  // Open: a floating panel by default, or a near-fullscreen panel when expanded.
+  // Full app, same full-page layout as before.
   return (
-    <div
-      className={`fixed z-50 flex flex-col overflow-hidden rounded-2xl border border-border bg-background shadow-2xl transition-all duration-200 ${
-        expanded
-          ? "inset-4 sm:inset-8"
-          : "bottom-6 right-6 h-[min(700px,85vh)] w-[min(440px,92vw)]"
-      }`}
-    >
+    <div className="flex h-screen w-full overflow-hidden bg-background">
       {/* Chat history overlay */}
       <ChatSidebar
         chats={chats}
@@ -272,7 +283,7 @@ const Index = () => {
         onClose={() => setSidebarOpen(false)}
       />
 
-      {/* Main Area */}
+      {/* Main Area - Full width */}
       <div className="flex flex-1 flex-col min-w-0">
         {/* Header */}
         <header className="flex items-center gap-3 border-b border-border bg-background/80 backdrop-blur-sm px-4 py-3 shrink-0">
@@ -285,6 +296,14 @@ const Index = () => {
             </h1>
           </div>
           <div className="ml-auto flex items-center gap-1.5">
+            {/* Back to home */}
+            <button
+              onClick={() => setStarted(false)}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+              title="Home"
+            >
+              <Home className="h-4 w-4" />
+            </button>
             {/* Chats button */}
             <button
               onClick={() => setSidebarOpen(true)}
@@ -323,22 +342,6 @@ const Index = () => {
               title="Toggle theme"
             >
               {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </button>
-            {/* Expand / shrink the floating panel */}
-            <button
-              onClick={() => setExpanded((e) => !e)}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent transition-colors"
-              title={expanded ? "Shrink" : "Expand"}
-            >
-              {expanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-            </button>
-            {/* Minimize back to the launcher button */}
-            <button
-              onClick={() => setWidgetOpen(false)}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent transition-colors"
-              title="Minimize"
-            >
-              <X className="h-4 w-4" />
             </button>
           </div>
         </header>
