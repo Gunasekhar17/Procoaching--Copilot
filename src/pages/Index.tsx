@@ -173,11 +173,12 @@ const Index = () => {
           return;
         }
 
-        // Merge the original file rows back in for IMPORT_PLAN previews — the
-        // backend only echoes a small sample, but confirming the import needs
-        // every row, which we already have on the client.
+        // Merge the row data back in for IMPORT_PLAN previews — for a file
+        // upload this is just the rows already on the client; for records
+        // pasted directly into the chat (no file), the backend echoes back
+        // the rows it extracted, since the client never had them.
         const importPreview = data.importPreview
-          ? { ...data.importPreview, rows: file?.rows || [] }
+          ? { ...data.importPreview, rows: data.importPreview.rows || file?.rows || [] }
           : undefined;
 
         const resultData = {
@@ -196,7 +197,7 @@ const Index = () => {
         };
 
         updateLastAgentMessage(chatId, {
-          content: resultData.summary || (resultData.success ? "✅ Done!" : resultData.error || "Command failed."),
+          content: resultData.summary || (resultData.success ? "Done." : resultData.error || "Command failed."),
           isLoading: false,
           result: resultData,
         });
