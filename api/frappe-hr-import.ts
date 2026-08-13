@@ -1,4 +1,5 @@
 import { corsHeaders, json } from "./_lib/cors";
+import { isRestrictedDoctype, isCancelAttempt, restrictedDoctypeError, CANCEL_ATTEMPT_ERROR } from "./_lib/permissions";
 
 export const config = { runtime: "edge" };
 
@@ -75,6 +76,9 @@ export default async function handler(req: Request): Promise<Response> {
     if (rows.length === 0) {
       return json({ success: false, error: "No rows to import." }, 400);
     }
+    if (isRestrictedDoctype(doctype)) {
+      return json({ success: false, error: restrictedDoctypeError(doctype) }, 403);
+    }
 
     const baseUrl = site_url.replace(/\/$/, "");
     const authHeaders: Record<string, string> = usingSession
@@ -124,6 +128,7 @@ export default async function handler(req: Request): Promise<Response> {
         if (rowAction === "update" && frappeField === "name") continue; // never try to rename via update
         mapped[frappeField] = row[fileCol];
       }
+      if (isCancelAttempt(mapped)) continue; // never cancel a document via import
       plan.push({ action: rowAction, key, mapped, docname });
     }
 
