@@ -35,12 +35,12 @@ const ChatSidebar = ({
     <>
       {/* Full-screen overlay */}
       <div
-        className="fixed inset-0 z-40 bg-background/60 backdrop-blur-sm"
+        className="fixed inset-0 z-[60] bg-background/60 backdrop-blur-sm"
         onClick={onClose}
       />
 
       {/* Centered panel like Claude's chat history */}
-      <div className="fixed inset-0 z-50 flex items-start justify-center pt-[10vh]" onClick={onClose}>
+      <div className="fixed inset-0 z-[70] flex items-start justify-center pt-[10vh]" onClick={onClose}>
         <div
           className="w-full max-w-2xl mx-4 rounded-2xl border border-border bg-card shadow-2xl overflow-hidden animate-fade-in"
           onClick={(e) => e.stopPropagation()}
