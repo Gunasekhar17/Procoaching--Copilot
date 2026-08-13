@@ -13,12 +13,18 @@ export function useSpeechInput(onResult: (text: string) => void) {
   const [isListening, setIsListening] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
   const recognitionRef = useRef<any>(null);
+  // Tracks whether the user intentionally stopped listening, vs. the
+  // recognition engine ending on its own (which some browsers still do
+  // after a long silence even in continuous mode) — lets us auto-restart
+  // in the latter case instead of cutting the user off mid-thought.
+  const keepListeningRef = useRef(false);
 
   useEffect(() => {
     setIsSupported(!!getSpeechRecognitionCtor());
   }, []);
 
   const stop = useCallback(() => {
+    keepListeningRef.current = false;
     recognitionRef.current?.stop();
     setIsListening(false);
   }, []);
@@ -29,6 +35,10 @@ export function useSpeechInput(onResult: (text: string) => void) {
 
     const recognition = new Ctor();
     recognition.lang = "en-US";
+    // continuous=true is the key fix: without it, the browser stops
+    // listening as soon as it detects a pause in speech, instead of
+    // waiting for the user to actually finish.
+    recognition.continuous = true;
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
 
@@ -36,9 +46,32 @@ export function useSpeechInput(onResult: (text: string) => void) {
       const transcript = event.results[event.results.length - 1][0].transcript;
       onResult(transcript);
     };
-    recognition.onerror = () => setIsListening(false);
-    recognition.onend = () => setIsListening(false);
 
+    recognition.onerror = (event: any) => {
+      // "no-speech" just means a pause was detected — not a real error.
+      // Let onend decide whether to restart; don't stop listening here.
+      if (event?.error === "no-speech") return;
+      keepListeningRef.current = false;
+      setIsListening(false);
+    };
+
+    recognition.onend = () => {
+      // Some browsers (esp. mobile) end the session on their own after a
+      // period of silence even with continuous=true. If the user hasn't
+      // explicitly tapped stop, restart automatically so a pause doesn't
+      // cut them off.
+      if (keepListeningRef.current) {
+        try {
+          recognition.start();
+          return;
+        } catch {
+          /* engine refused to restart — fall through and mark stopped */
+        }
+      }
+      setIsListening(false);
+    };
+
+    keepListeningRef.current = true;
     recognitionRef.current = recognition;
     recognition.start();
     setIsListening(true);
