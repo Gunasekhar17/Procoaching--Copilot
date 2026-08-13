@@ -9,13 +9,13 @@ const systemPrompt = `You are an expert Frappe/ERPNext code generator. Generate 
 
 Frappe does NOT use import statements. The \`frappe\` module is GLOBALLY available in all contexts.
 
-❌ NEVER generate:
+NEVER generate:
 - import frappe
 - from frappe import _
 - from frappe.model import ...
 - import json (use frappe.parse_json or frappe.as_json instead)
 
-✅ CORRECT — frappe is globally available:
+CORRECT — frappe is globally available:
 - frappe.db.get_all(...)
 - frappe.get_doc(...)
 - frappe.throw(...)
@@ -106,10 +106,10 @@ export default async function handler(req: Request): Promise<Response> {
                     description: "Programming language of the code",
                   },
                   code: { type: "string", description: "The generated code — MUST NOT contain any import statements" },
-                  explanation: { type: "string", description: "Brief explanation of what the code does" },
+                  explanation: { type: "string", description: "Brief explanation of what the code does. Plain prose, no emoji, no double spaces." },
                   usage_instructions: {
                     type: "string",
-                    description: "Step-by-step instructions on where and how to use this code in Frappe/ERPNext",
+                    description: "Step-by-step instructions on where and how to use this code in Frappe/ERPNext. Plain prose or a simple numbered list, no emoji, no double spaces.",
                   },
                 },
                 required: ["title", "script_type", "language", "code", "explanation", "usage_instructions"],
