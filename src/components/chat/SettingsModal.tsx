@@ -190,7 +190,7 @@ const SettingsModal = ({ open, onClose, connection, onConnect, onDisconnect }: S
               </div>
               {hrmsDetected === false && (
                 <p className="text-xs text-muted-foreground">
-                  ⚠️ Frappe HRMS wasn't detected on this site — HR queries may not return data.
+                  Frappe HRMS wasn't detected on this site — HR queries may not return data.
                 </p>
               )}
             </div>
