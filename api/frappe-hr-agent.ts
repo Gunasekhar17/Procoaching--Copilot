@@ -1,5 +1,6 @@
 import { corsHeaders, json } from "./_lib/cors";
 import { callClaude, firstToolCallArgs, messageText, ClaudeError, type ChatMessage } from "./_lib/anthropic";
+import { isRestrictedDoctype } from "./_lib/permissions";
 
 export const config = { runtime: "edge" };
 
@@ -8,6 +9,43 @@ interface UploadedFile {
   headers: string[];
   rows: Record<string, any>[];
 }
+
+// Fetches every DocType the connected user can read, across every
+// installed app/module and every business area — Sales, Purchase, Stock,
+// Accounts, Projects, Support, Manufacturing, CRM, HR, etc. This mirrors
+// Frappe's own permission system exactly: whatever DocTypes come back for
+// these credentials is whatever this user/API key is allowed to see, and
+// none of it is filtered out here — if their Frappe permissions cover
+// everything, this assistant can work with everything too.
+// (istable/issingle are excluded because those are child-table rows and
+// single-record settings doctypes, which the QUERY action isn't built to
+// list/count/sum the way it does normal doctypes — not a permission cut.)
+async function fetchDoctypeCatalog(baseUrl: string, authHeaders: Record<string, string>): Promise<string> {
+  try {
+    const params = new URLSearchParams();
+    params.set("filters", JSON.stringify([["istable", "=", 0], ["issingle", "=", 0]]));
+    params.set("fields", JSON.stringify(["name", "module"]));
+    params.set("limit_page_length", "0");
+    const url = `${baseUrl}/api/resource/DocType?${params.toString()}`;
+    const resp = await fetch(url, { headers: authHeaders });
+    if (!resp.ok) return "";
+    const data = await resp.json();
+    const rows: { name: string; module: string }[] = Array.isArray(data.data) ? data.data : [];
+
+    const byModule = new Map<string, string[]>();
+    for (const r of rows) {
+      if (!r.module) continue;
+      if (!byModule.has(r.module)) byModule.set(r.module, []);
+      byModule.get(r.module)!.push(r.name);
+    }
+    return Array.from(byModule.entries())
+      .map(([mod, names]) => `${mod}: ${names.join(", ")}`)
+      .join("\n");
+  } catch {
+    return ""; // fall back to the AI's general Frappe/ERPNext knowledge
+  }
+}
+
 
 // Frappe GET requests have URL length limits, so when matching a large set of
 // keys we batch the "in" filter instead of sending everything in one request.
@@ -115,20 +153,24 @@ First 3 rows (sample):
 ${JSON.stringify(file.rows.slice(0, 3), null, 2)}`
       : "";
 
+    const doctypeCatalog = await fetchDoctypeCatalog(baseUrl, frappeAuthHeaders);
+
     // ============ STEP 1: AI parses the question into a query plan ============
-    const parsePrompt = `You are the Frappe HR Copilot — a Q&A and data-management assistant for Frappe HRMS (Human Resource Management).
-Users ask questions about their HR / people data, and can attach a CSV/Excel file to cross-check against Frappe or to create/update records in bulk.
+    const parsePrompt = `You are the Frappe Copilot — a Q&A and data-management assistant for the connected Frappe site, covering every module the user has access to (HR, Sales, Purchase, Stock, Accounting, Projects, Support, Manufacturing, CRM, and more) — not limited to HR.
+Users ask questions about any of their business data, and can attach a CSV/Excel file to cross-check against Frappe or to create/update records in bulk.
 
 CURRENT DATE: ${today}
 ${fileContext}
 
 ACTIONS you can choose:
 - "QUERY": look up / list / count / sum data already in Frappe. No file needed.
-- "ANSWER": answer a conceptual question, or something outside HR scope, directly in "summary". No data lookup.
+- "ANSWER": answer a conceptual question, or something outside what this assistant can do, directly in "summary". No data lookup.
 - "CLARIFY": you need more detail before you can act. Ask in "summary".
 - "CROSS_CHECK": only when a file is attached. Compare the uploaded file's rows against existing Frappe records to find mismatches or records missing from Frappe. Read-only — does not change any data.
-- "IMPORT_PLAN": only when a file is attached AND the user is asking to create and/or update Frappe records from the file (e.g. "add these employees", "update salaries from this file", "import this"). This only PLANS the import (no writes happen yet) — a confirmation step happens after.
-- "WRITE_PLAN": the user wants to create ONE new record, or update ONE existing record, directly from their message — no file involved (e.g. "add a new employee named Priya Sharma in Engineering", "set John's designation to Manager", "mark EMP-0004 as Left"). This only PLANS the write (nothing is saved yet) — a confirmation step happens after, same as IMPORT_PLAN.
+- "IMPORT_PLAN": only when a file is attached AND the user is asking to create and/or update Frappe records from the file (e.g. "add these employees", "update these items from this file", "import this"). This only PLANS the import (no writes happen yet) — a confirmation step happens after.
+- "WRITE_PLAN": the user wants to create ONE new record, or update ONE existing record, directly from their message — no file involved (e.g. "add a new employee named Priya Sharma in Engineering", "create a sales order for Acme Corp", "set John's designation to Manager"). This only PLANS the write (nothing is saved yet) — a confirmation step happens after, same as IMPORT_PLAN.
+
+PERMISSIONS: You can create and update records — every write is only ever planned here and requires the user to explicitly confirm before anything is saved. You must NEVER delete, cancel, void, or un-submit a record, and must NEVER set a "docstatus" field to 2 (Frappe's internal value for "Cancelled") in field_values — there is no delete or cancel action available in this app at all, by design. If the user asks to delete, cancel, void, or remove a record, use "ANSWER" and explain that this assistant only creates and updates records — deleting or cancelling has to be done directly in Frappe.
 
 COMMON QUERY PATTERNS (for QUERY):
 - "how many" → aggregate: "count"
@@ -136,66 +178,42 @@ COMMON QUERY PATTERNS (for QUERY):
 - "list/show/what are" → aggregate: "list"
 - "details of" → aggregate: "none" (single record lookup)
 
-DOCTYPES (use exact names — Frappe HRMS only, this assistant does not handle Sales/Purchase/Stock/Accounting/Payroll data):
-- Employees → "Employee"
-- Employee Onboarding → "Employee Onboarding"
-- Employee Separation / exits → "Employee Separation"
-- Employee Grievance → "Employee Grievance"
-- Employee Referral → "Employee Referral"
-- Leave Applications → "Leave Application"
-- Leave Allocation / leave balances → "Leave Allocation"
-- Leave Types → "Leave Type"
-- Compensatory Leave Requests → "Compensatory Leave Request"
-- Attendance → "Attendance"
-- Attendance Requests → "Attendance Request"
-- Shift Types → "Shift Type"
-- Shift Assignments → "Shift Assignment"
-- Holiday Lists → "Holiday List"
-- Departments → "Department"
-- Designations → "Designation"
-- Branches → "Branch"
-- Employee Grades → "Employee Grade"
-- Expense Claims → "Expense Claim"
-- Appraisals / performance reviews → "Appraisal"
-- Appraisal Cycles → "Appraisal Cycle"
-- Goals / KRAs → "Goal"
-- Training Events → "Training Event"
-- Training Programs → "Training Program"
-- Job Openings → "Job Opening"
-- Job Applicants → "Job Applicant"
-- Job Offers → "Job Offer"
-- Interviews → "Interview"
-- Travel Requests → "Travel Request"
+DOCTYPES AVAILABLE ON THIS SITE (grouped by module — use the exact name shown):
+${doctypeCatalog || "(catalog unavailable — use standard Frappe/ERPNext doctype names based on general knowledge, e.g. Employee, Sales Order, Purchase Order, Item, Customer, Supplier, Journal Entry)"}
 
-This assistant does not handle Payroll (salary slips, salary structures, payroll entries, additional salary, employee advances, or loans) — for anything payroll-related, politely redirect the user to the Payroll module in Frappe HRMS directly.
-
+Some commonly-used core HR doctypes and what they cover, for quick reference:
+- Employees → "Employee" (fields: employee_name, department, designation, status, date_of_joining)
+- Leave Applications → "Leave Application"; Leave balances → "Leave Allocation"; Leave Types → "Leave Type"
+- Attendance → "Attendance"; Attendance Requests → "Attendance Request"
+- Departments → "Department"; Designations → "Designation"; Branches → "Branch"
+- Job Openings → "Job Opening"; Job Applicants → "Job Applicant"; Job Offers → "Job Offer"
+- Appraisals → "Appraisal"; Goals/KRAs → "Goal"; Training → "Training Event" / "Training Program"
 
 FILTER FORMAT: Use Frappe filter syntax: [["field","operator","value"]]
 Common operators: =, !=, >, <, >=, <=, like, between, in
 
 DATE FILTERS: Use YYYY-MM-DD format. For "this month", use >= first day of current month. For "today", use = ${today}.
 
-FIELDS: Request only relevant fields. Always include "name" field. For Employee queries, prefer fields like employee_name, department, designation, status, date_of_joining. For lists, pick 3-5 most useful fields.
+FIELDS: Request only relevant fields. Always include "name" field. For lists, pick 3-5 most useful fields for that doctype.
 
 LIMIT: Default to 20. Use 0 for count queries. Use higher limits for "all" queries.
 
-EXPORT: If the user explicitly asks for the data as a downloadable file ("give me all employee data in excel", "export this as csv", "send me a spreadsheet of..."), set export_format to "csv" or "xlsx" (match whichever they asked for; default to "xlsx" if unspecified). Otherwise set export_format to "none".
+EXPORT: Only set export_format to "csv" or "xlsx" when the user EXPLICITLY asks for the data as a downloadable file ("give me all employee data in excel", "export this as csv", "send me a spreadsheet of..."). This is the only signal that controls whether a download is offered — do not set it just because a query returns a list or a lot of rows. For anything else, set export_format to "none".
 
 FOR CROSS_CHECK AND IMPORT_PLAN (only when a file is attached):
-- doctype: the Frappe HRMS doctype the file rows correspond to
-- file_key_column: the column in the uploaded file that uniquely identifies each record (e.g. an employee ID, email, or name column)
+- doctype: the Frappe doctype the file rows correspond to
+- file_key_column: the column in the uploaded file that uniquely identifies each record (e.g. an ID, email, or name column)
 - match_field: the Frappe field that corresponds to file_key_column (e.g. "employee", "name", "personal_email") — this is what's used to find the matching Frappe record
 - field_mapping: an object mapping EVERY relevant uploaded file column name to the corresponding Frappe field name for that doctype
 - import_mode (IMPORT_PLAN only): "create" if rows should only be created, "update" if only updated, "upsert" if it should create-or-update depending on whether a match is found (use "upsert" unless the user specifies otherwise)
 
 FOR WRITE_PLAN (single record, no file):
-- doctype: the Frappe HRMS doctype to write to
+- doctype: the Frappe doctype to write to
 - record_action: "create" for a brand new record, "update" for changing an existing one
 - lookup_field + lookup_value (update only): the Frappe field and value that identifies WHICH existing record to update (e.g. lookup_field "employee_name", lookup_value "Priya Sharma"). Prefer a human name/email over a raw ID unless the user gave an ID.
 - field_values: an object of Frappe field name -> new value, containing every field the user wants set (for create: all the fields they described; for update: only the field(s) they want changed — never include lookup_field/lookup_value's own field here unless they're also changing it)
 If the user's request is too vague to know which fields to set, use CLARIFY instead.
 
-This site is connected as a Frappe HRMS instance. If the question is outside HR (e.g. about sales, purchasing, or accounting), politely say so in "summary" and set action to "ANSWER".
 If you can't determine what data to query or how to map the file, set action to "CLARIFY" and ask for more details.`;
 
     const parseMessages: ChatMessage[] = [{ role: "system", content: parsePrompt }];
@@ -218,13 +236,13 @@ If you can't determine what data to query or how to map the file, set action to 
           {
             type: "function",
             function: {
-              name: "query_frappe_hr",
-              description: "Query Frappe HRMS data, cross-check or import an uploaded file, answer an HR knowledge question, or ask for clarification.",
+              name: "query_frappe",
+              description: "Query Frappe data (any module), cross-check or import an uploaded file, answer a general knowledge question, or ask for clarification.",
               parameters: {
                 type: "object",
                 properties: {
                   action: { type: "string", enum: ["QUERY", "ANSWER", "CLARIFY", "CROSS_CHECK", "IMPORT_PLAN", "WRITE_PLAN"] },
-                  doctype: { type: "string", description: "Frappe HRMS DocType to query/cross-check/import" },
+                  doctype: { type: "string", description: "Frappe DocType to query/cross-check/import (any module)" },
                   filters: { type: "array", description: "Frappe filters array (QUERY only)" },
                   fields: { type: "array", items: { type: "string" }, description: "Fields to retrieve (QUERY only)" },
                   limit_page_length: { type: "number", description: "Number of records, 0 for all (QUERY only)" },
@@ -263,7 +281,7 @@ If you can't determine what data to query or how to map the file, set action to 
         action: "ANSWER",
         summary:
           textContent ||
-          "I'm not sure how to answer that. Try asking about your employees, leave, attendance, payroll, or expense claims.",
+          "I'm not sure how to answer that. Try asking about any of your Frappe data — employees, leave, sales, purchasing, stock, accounting, and more.",
       });
     }
 
@@ -331,7 +349,7 @@ If you can't determine what data to query or how to map the file, set action to 
       const summaryMessages: ChatMessage[] = [
         {
           role: "system",
-          content: `You are the Frappe HR Copilot. Summarize a cross-check between an uploaded file and live Frappe data in 2-4 sentences, conversational, markdown ok. Mention counts of matched, mismatched fields, and records missing from Frappe.`,
+          content: `You are the Frappe Copilot. Summarize a cross-check between an uploaded file and live Frappe data in 2-4 sentences, conversational, markdown ok. Mention counts of matched, mismatched fields, and records missing from Frappe.`,
         },
         { role: "user", content: JSON.stringify(crossCheck).slice(0, 4000) },
       ];
@@ -350,6 +368,9 @@ If you can't determine what data to query or how to map the file, set action to 
     if (plan.action === "IMPORT_PLAN") {
       if (!file) {
         return json({ success: true, action: "ANSWER", summary: "Attach a CSV or Excel file first, then tell me what to import." });
+      }
+      if (isRestrictedDoctype(plan.doctype)) {
+        return json({ success: true, action: "ANSWER", summary: `I can't write to **${plan.doctype}** — that controls site users, permissions, or configuration rather than business data. Please make that change directly in Frappe.` });
       }
       const fileKeyColumn = plan.file_key_column;
       const matchField = plan.match_field;
@@ -416,6 +437,12 @@ If you can't determine what data to query or how to map the file, set action to 
 
       if (!plan.doctype || Object.keys(fieldValues).length === 0) {
         return json({ success: true, action: "CLARIFY", summary: "What fields should I set, and on which record?", needs_input: true });
+      }
+      if (isRestrictedDoctype(plan.doctype)) {
+        return json({ success: true, action: "ANSWER", summary: `I can't write to **${plan.doctype}** — that controls site users, permissions, or configuration rather than business data. Please make that change directly in Frappe.` });
+      }
+      if (String(fieldValues.docstatus) === "2") {
+        return json({ success: true, action: "ANSWER", summary: "Cancelling or un-submitting records isn't supported by this assistant. Please cancel it directly in Frappe if that's what you need." });
       }
 
       if (recordAction === "create") {
@@ -531,7 +558,7 @@ If you can't determine what data to query or how to map the file, set action to 
     const answerMessages: ChatMessage[] = [
       {
         role: "system",
-        content: `You are the Frappe HR Copilot. The user asked a question and we fetched data from their Frappe HRMS site.
+        content: `You are the Frappe Copilot. The user asked a question and we fetched data from their Frappe site.
 Generate a clear, concise, human-readable answer based on the data.
 
 Rules:
