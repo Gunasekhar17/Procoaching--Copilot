@@ -251,8 +251,8 @@ const Index = () => {
     const examples = [
       { icon: Search, label: "Query records", prompt: "How many employees are in my system?" },
       { icon: UserPlus, label: "Create employee", prompt: "Create a new employee named Priya Sharma" },
-      { icon: CalendarClock, label: "Leave requests", prompt: "Show pending leave applications" },
-      { icon: FileUp, label: "Bulk import", prompt: "Import my employees from a CSV" },
+      { icon: CalendarClock, label: "Create Shift", prompt: "Create a new shift assignment" },
+      { icon: FileUp, label: "Bulk Update", prompt: "Bulk update employee records from a CSV" },
     ];
 
     return (
@@ -296,14 +296,7 @@ const Index = () => {
             Ask a question or describe a change in plain English. Frappe Copilot figures out the doctype, the
             filters, and the fields, across HR, Shifts, Roster and every module you have access to.
           </p>
-          <div className="mt-7 flex flex-col items-center gap-2 sm:flex-row sm:justify-center">
-            <button
-              onClick={() => setStarted(true)}
-              className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-            >
-              Try it
-              <ArrowRight className="h-4 w-4" />
-            </button>
+          <div className="mt-7 flex justify-center">
             <span className="text-xs text-muted-foreground">Just your Frappe site URL and an API key</span>
           </div>
         </section>
@@ -320,28 +313,24 @@ const Index = () => {
                 </span>
               </div>
 
-              <p className="text-sm leading-relaxed text-foreground sm:text-base">
+              <p className="text-center text-sm leading-relaxed text-foreground sm:text-base">
                 Show me every{" "}
                 <span className="rounded-md bg-indigo-500/10 px-1.5 py-0.5 font-medium text-indigo-600 dark:text-indigo-400">
                   [Employee]
                 </span>{" "}
                 in{" "}
                 <span className="rounded-md bg-fuchsia-500/10 px-1.5 py-0.5 font-medium text-fuchsia-600 dark:text-fuchsia-400">
-                  [Production]
+                  [My System]
                 </span>{" "}
                 whose{" "}
                 <span className="rounded-md bg-sky-500/10 px-1.5 py-0.5 font-medium text-sky-600 dark:text-sky-400">
-                  [leave balance]
+                  [Mobile]
                 </span>{" "}
-                is under{" "}
+                is{" "}
                 <span className="rounded-md bg-amber-500/10 px-1.5 py-0.5 font-medium text-amber-600 dark:text-amber-400">
-                  [5 days]
+                  [not there]
                 </span>
-                , then create a[n]{" "}
-                <span className="rounded-md bg-emerald-500/10 px-1.5 py-0.5 font-medium text-emerald-600 dark:text-emerald-400">
-                  [Leave Application]
-                </span>{" "}
-                for each one.
+                .
               </p>
 
               <div className="mt-5 flex items-center justify-between gap-3">
@@ -349,7 +338,7 @@ const Index = () => {
                 <button
                   onClick={() =>
                     openWithPrompt(
-                      "Show me every employee in Production whose leave balance is under 5 days"
+                      "Show me every employee in my system whose mobile number is not set"
                     )
                   }
                   className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-foreground px-4 py-2 text-xs font-medium text-background hover:opacity-90 transition-opacity"
