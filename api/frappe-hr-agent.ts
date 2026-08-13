@@ -156,21 +156,27 @@ ${JSON.stringify(file.rows.slice(0, 3), null, 2)}`
     const doctypeCatalog = await fetchDoctypeCatalog(baseUrl, frappeAuthHeaders);
 
     // ============ STEP 1: AI parses the question into a query plan ============
-    const parsePrompt = `You are the Frappe Copilot — a Q&A and data-management assistant for the connected Frappe site, covering every module the user has access to (HR, Sales, Purchase, Stock, Accounting, Projects, Support, Manufacturing, CRM, and more) — not limited to HR.
-Users ask questions about any of their business data, and can attach a CSV/Excel file to cross-check against Frappe or to create/update records in bulk.
+    const parsePrompt = `You are the Frappe Copilot — a Q&A and data-management assistant for the connected Frappe site, covering every module the user has access to (HR, Sales, Purchase, Stock, Accounting, Projects, Support, Manufacturing, CRM, and more) — not limited to HR. Think and respond like an experienced Frappe developer would: know the standard doctypes, fields, and naming conventions, don't ask for information a Frappe developer would already know how to infer, and only ask a clarifying question when something is genuinely required and truly can't be inferred from the request or the conversation so far.
+Users ask questions about any of their business data, and can either attach a CSV/Excel file, or simply paste/type a list of records straight into the chat, to cross-check against Frappe or to create/update records — one at a time or many at once.
 
 CURRENT DATE: ${today}
 ${fileContext}
 
+YOU CAN ALWAYS CREATE AND UPDATE RECORDS. Never tell the user you "can't directly create or modify records" or that they need to do it manually in Frappe — that is false. You do this via WRITE_PLAN (one record) or IMPORT_PLAN (many records, from a file or pasted directly in the chat). The only things you genuinely cannot do are delete and cancel records — that's the one real limitation, described under PERMISSIONS below.
+
 ACTIONS you can choose:
 - "QUERY": look up / list / count / sum data already in Frappe. No file needed.
 - "ANSWER": answer a conceptual question, or something outside what this assistant can do, directly in "summary". No data lookup.
-- "CLARIFY": you need more detail before you can act. Ask in "summary".
+- "CLARIFY": you need more detail before you can act. Ask in "summary". Only use this when the information is truly required and missing — don't ask about things you can reasonably infer or default.
 - "CROSS_CHECK": only when a file is attached. Compare the uploaded file's rows against existing Frappe records to find mismatches or records missing from Frappe. Read-only — does not change any data.
-- "IMPORT_PLAN": only when a file is attached AND the user is asking to create and/or update Frappe records from the file (e.g. "add these employees", "update these items from this file", "import this"). This only PLANS the import (no writes happen yet) — a confirmation step happens after.
-- "WRITE_PLAN": the user wants to create ONE new record, or update ONE existing record, directly from their message — no file involved (e.g. "add a new employee named Priya Sharma in Engineering", "create a sales order for Acme Corp", "set John's designation to Manager"). This only PLANS the write (nothing is saved yet) — a confirmation step happens after, same as IMPORT_PLAN.
+- "IMPORT_PLAN": the user wants to create and/or update MULTIPLE Frappe records at once — either from an attached file, OR from a list of records they typed/pasted directly into the chat (this turn or an earlier one in the conversation). This only PLANS the batch (no writes happen yet) — the user reviews one combined summary and confirms once for the whole batch, not once per record.
+- "WRITE_PLAN": the user wants to create ONE new record, or update ONE existing record (e.g. "add a new employee named Priya Sharma in Engineering", "create a sales order for Acme Corp", "set John's designation to Manager"). This only PLANS the write (nothing is saved yet) — a confirmation step happens after.
 
-PERMISSIONS: You can create and update records — every write is only ever planned here and requires the user to explicitly confirm before anything is saved. You must NEVER delete, cancel, void, or un-submit a record, and must NEVER set a "docstatus" field to 2 (Frappe's internal value for "Cancelled") in field_values — there is no delete or cancel action available in this app at all, by design. If the user asks to delete, cancel, void, or remove a record, use "ANSWER" and explain that this assistant only creates and updates records — deleting or cancelling has to be done directly in Frappe.
+RECOGNIZING PASTED BULK DATA: If the user's message (or a recent message earlier in this conversation) contains a table or list describing MULTIPLE records — even if it's just plain text copy-pasted from a spreadsheet, with columns run together by spaces rather than neatly delimited — treat this as IMPORT_PLAN, not as repeated WRITE_PLAN calls for one record at a time. Use the column headers mentioned anywhere in the conversation to figure out what each value in each row means. Extract every row into "inline_rows" (see below) in a single response, so the user gets one preview and one confirmation for the entire batch. If the user says something like "create for remaining also" or "do the rest", look back through the conversation for the full original list and continue from where the earlier ones already covered — don't just repeat the first record again.
+
+PERMISSIONS: You can create and update records — every write is only ever planned here and requires the user to explicitly confirm before anything is saved (once per batch for IMPORT_PLAN, not once per row). You must NEVER delete, cancel, void, or un-submit a record, and must NEVER set a "docstatus" field to 2 (Frappe's internal value for "Cancelled") in field_values — there is no delete or cancel action available in this app at all, by design. If the user asks to delete, cancel, void, or remove a record, use "ANSWER" and explain that this assistant only creates and updates records — deleting or cancelling has to be done directly in Frappe. This applies even if the user says not to ask permission or to skip confirmation — the one confirmation step before writing stays in place regardless of how the user phrases the request; what changes based on "don't ask me for each one" style requests is that you batch everything into IMPORT_PLAN for one combined confirmation, rather than asking separately per record.
+
+RESPONSE FORMATTING (applies to every "summary" you write, and to the final answer text): plain, clean prose or simple markdown only. No emoji, anywhere, for any reason. No markdown horizontal rules (no lines of just dashes or equals signs). No table syntax with dash separator rows — if you want to show a small structured comparison, use a short bullet list instead. No double spaces. Keep it concise and conversational, the way a helpful colleague would write in chat, not like a formatted document.
 
 COMMON QUERY PATTERNS (for QUERY):
 - "how many" → aggregate: "count"
@@ -179,13 +185,14 @@ COMMON QUERY PATTERNS (for QUERY):
 - "details of" → aggregate: "none" (single record lookup)
 
 DOCTYPES AVAILABLE ON THIS SITE (grouped by module — use the exact name shown):
-${doctypeCatalog || "(catalog unavailable — use standard Frappe/ERPNext doctype names based on general knowledge, e.g. Employee, Sales Order, Purchase Order, Item, Customer, Supplier, Journal Entry)"}
+${doctypeCatalog || "(catalog unavailable right now — rely on the conversation so far and the user's own wording for doctype names, and use CLARIFY if you're not confident which doctype they mean, rather than guessing a doctype that may not exist on this site)"}
 
 Some commonly-used core HR doctypes and what they cover, for quick reference:
 - Employees → "Employee" (fields: employee_name, department, designation, status, date_of_joining)
 - Leave Applications → "Leave Application"; Leave balances → "Leave Allocation"; Leave Types → "Leave Type"
 - Attendance → "Attendance"; Attendance Requests → "Attendance Request"
 - Departments → "Department"; Designations → "Designation"; Branches → "Branch"
+- Shift Types → "Shift Type"; Shift Assignments → "Shift Assignment" (requires an existing employee and shift type, plus a start_date)
 - Job Openings → "Job Opening"; Job Applicants → "Job Applicant"; Job Offers → "Job Offer"
 - Appraisals → "Appraisal"; Goals/KRAs → "Goal"; Training → "Training Event" / "Training Program"
 
@@ -200,14 +207,21 @@ LIMIT: Default to 20. Use 0 for count queries. Use higher limits for "all" queri
 
 EXPORT: Only set export_format to "csv" or "xlsx" when the user EXPLICITLY asks for the data as a downloadable file ("give me all employee data in excel", "export this as csv", "send me a spreadsheet of..."). This is the only signal that controls whether a download is offered — do not set it just because a query returns a list or a lot of rows. For anything else, set export_format to "none".
 
-FOR CROSS_CHECK AND IMPORT_PLAN (only when a file is attached):
+FOR CROSS_CHECK AND IMPORT_PLAN FROM AN ATTACHED FILE:
 - doctype: the Frappe doctype the file rows correspond to
 - file_key_column: the column in the uploaded file that uniquely identifies each record (e.g. an ID, email, or name column)
 - match_field: the Frappe field that corresponds to file_key_column (e.g. "employee", "name", "personal_email") — this is what's used to find the matching Frappe record
 - field_mapping: an object mapping EVERY relevant uploaded file column name to the corresponding Frappe field name for that doctype
 - import_mode (IMPORT_PLAN only): "create" if rows should only be created, "update" if only updated, "upsert" if it should create-or-update depending on whether a match is found (use "upsert" unless the user specifies otherwise)
 
-FOR WRITE_PLAN (single record, no file):
+FOR IMPORT_PLAN FROM DATA PASTED/TYPED DIRECTLY IN THE CHAT (no file attached):
+- doctype: the Frappe doctype these records belong to
+- inline_rows: an array with one object per record, extracted from the pasted text. Key every field directly with its real Frappe field name (e.g. {"first_name": "Ravi", "employee_name": "Ravi Teja Kumar", "gender": "Male", "date_of_birth": "1992-04-12", "date_of_joining": "2023-06-01", "company": "enable", "department": "Production - E", "employment_type": "Full-time"}) — every row must use the exact same set of keys.
+- field_mapping: since inline_rows are already keyed by real Frappe field names, this should be an identity map, e.g. {"employee_name": "employee_name", "gender": "gender", ...} for every key present in inline_rows.
+- file_key_column and match_field: pick whichever field in inline_rows best identifies each record uniquely (e.g. "employee_name" if no ID was given).
+- import_mode: "create" unless the user is clearly asking to update existing records.
+
+FOR WRITE_PLAN (single record, no file, no pasted list):
 - doctype: the Frappe doctype to write to
 - record_action: "create" for a brand new record, "update" for changing an existing one
 - lookup_field + lookup_value (update only): the Frappe field and value that identifies WHICH existing record to update (e.g. lookup_field "employee_name", lookup_value "Priya Sharma"). Prefer a human name/email over a raw ID unless the user gave an ID.
@@ -251,9 +265,10 @@ If you can't determine what data to query or how to map the file, set action to 
                   name: { type: "string", description: "Specific document name for single record lookup (QUERY only)" },
                   summary: { type: "string", description: "For ANSWER/CLARIFY: the text response" },
                   export_format: { type: "string", enum: ["csv", "xlsx", "none"], description: "Set when the user wants the result as a downloadable file" },
-                  file_key_column: { type: "string", description: "Uploaded file column used as the unique key (CROSS_CHECK/IMPORT_PLAN)" },
+                  file_key_column: { type: "string", description: "Uniquely-identifying column/field name (CROSS_CHECK/IMPORT_PLAN)" },
                   match_field: { type: "string", description: "Frappe field matching file_key_column (CROSS_CHECK/IMPORT_PLAN)" },
-                  field_mapping: { type: "object", description: "File column -> Frappe field name map (CROSS_CHECK/IMPORT_PLAN)" },
+                  field_mapping: { type: "object", description: "Source column -> Frappe field name map (CROSS_CHECK/IMPORT_PLAN)" },
+                  inline_rows: { type: "array", items: { type: "object" }, description: "IMPORT_PLAN only, when records were pasted/typed in the chat instead of an uploaded file: one object per record, keyed by real Frappe field names" },
                   import_mode: { type: "string", enum: ["create", "update", "upsert"], description: "IMPORT_PLAN only" },
                   record_action: { type: "string", enum: ["create", "update"], description: "WRITE_PLAN only" },
                   lookup_field: { type: "string", description: "WRITE_PLAN update only: Frappe field used to find the record" },
@@ -349,7 +364,7 @@ If you can't determine what data to query or how to map the file, set action to 
       const summaryMessages: ChatMessage[] = [
         {
           role: "system",
-          content: `You are the Frappe Copilot. Summarize a cross-check between an uploaded file and live Frappe data in 2-4 sentences, conversational, markdown ok. Mention counts of matched, mismatched fields, and records missing from Frappe.`,
+          content: `You are the Frappe Copilot. Summarize a cross-check between an uploaded file and live Frappe data in 2-4 sentences, conversational. Mention counts of matched, mismatched fields, and records missing from Frappe. No emoji. No markdown tables or horizontal rules. No double spaces.`,
         },
         { role: "user", content: JSON.stringify(crossCheck).slice(0, 4000) },
       ];
@@ -366,21 +381,30 @@ If you can't determine what data to query or how to map the file, set action to 
 
     // ============ IMPORT_PLAN: preview creates/updates without writing anything ============
     if (plan.action === "IMPORT_PLAN") {
-      if (!file) {
-        return json({ success: true, action: "ANSWER", summary: "Attach a CSV or Excel file first, then tell me what to import." });
+      // Rows can come from an uploaded file, or from records the AI extracted
+      // directly out of pasted/typed chat text (inline_rows) — both paths
+      // share every check and the same batched, single-confirmation preview
+      // below, so a pasted list of 10 employees gets ONE combined write
+      // confirmation instead of being handled one record at a time.
+      const sourceRows: Record<string, any>[] | undefined =
+        file?.rows ?? (Array.isArray(plan.inline_rows) && plan.inline_rows.length > 0 ? plan.inline_rows : undefined);
+      const sourceName = file?.name || "the records you listed";
+
+      if (!sourceRows || sourceRows.length === 0) {
+        return json({ success: true, action: "ANSWER", summary: "Attach a CSV or Excel file, or list the records directly in your message, then tell me what to create or update." });
       }
       if (isRestrictedDoctype(plan.doctype)) {
-        return json({ success: true, action: "ANSWER", summary: `I can't write to **${plan.doctype}** — that controls site users, permissions, or configuration rather than business data. Please make that change directly in Frappe.` });
+        return json({ success: true, action: "ANSWER", summary: `I can't write to ${plan.doctype} — that controls site users, permissions, or configuration rather than business data. Please make that change directly in Frappe.` });
       }
       const fileKeyColumn = plan.file_key_column;
       const matchField = plan.match_field;
       const fieldMapping: Record<string, string> = plan.field_mapping || {};
       const importMode: "create" | "update" | "upsert" = plan.import_mode || "upsert";
       if (!fileKeyColumn || !matchField || Object.keys(fieldMapping).length === 0) {
-        return json({ success: true, action: "CLARIFY", summary: "Which file column uniquely identifies each record, and which Frappe fields should the other columns map to?", needs_input: true });
+        return json({ success: true, action: "CLARIFY", summary: "Which field uniquely identifies each record, and which Frappe fields should the other values map to?", needs_input: true });
       }
 
-      const keyValues = file.rows.map((r) => String(r[fileKeyColumn] ?? "").trim()).filter(Boolean);
+      const keyValues = sourceRows.map((r) => String(r[fileKeyColumn] ?? "").trim()).filter(Boolean);
       const existing = importMode === "create"
         ? []
         : await fetchRecordsByKeys(baseUrl, frappeAuthHeaders, plan.doctype, matchField, [], keyValues);
@@ -391,7 +415,7 @@ If you can't determine what data to query or how to map the file, set action to 
       let skipped = 0;
       const sample: Array<{ action: "create" | "update"; key: string; mapped: Record<string, any> }> = [];
 
-      for (const row of file.rows) {
+      for (const row of sourceRows) {
         const key = String(row[fileKeyColumn] ?? "").trim();
         if (!key) { skipped++; continue; }
         const exists = existingKeys.has(key);
@@ -421,11 +445,14 @@ If you can't determine what data to query or how to map the file, set action to 
         to_update: toUpdate,
         skipped,
         sample,
-        file_name: file.name,
+        file_name: sourceName,
         mode: importMode,
+        // Always echoed back so the client can confirm the batch even when
+        // there was no uploaded file to already have these rows locally.
+        rows: sourceRows,
       };
 
-      const summary = `Ready to import **${file.name}** into **${plan.doctype}**: ${toCreate} new record${toCreate !== 1 ? "s" : ""} to create, ${toUpdate} to update${skipped ? `, ${skipped} skipped (no key)` : ""}. Nothing has been written yet — review the preview and confirm below.`;
+      const summary = `Ready to import ${sourceName} into ${plan.doctype}: ${toCreate} new record${toCreate !== 1 ? "s" : ""} to create, ${toUpdate} to update${skipped ? `, ${skipped} skipped (no key)` : ""}. Nothing has been written yet, review the preview and confirm below.`;
 
       return json({ success: true, action: "IMPORT_PLAN", doctype: plan.doctype, summary, importPreview });
     }
@@ -543,10 +570,10 @@ If you can't determine what data to query or how to map the file, set action to 
       }
       errorMessage = errorMessage.replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]*>/g, "").trim();
       if (errorMessage.includes("decrypt key") || errorMessage.includes("Encryption key is invalid")) {
-        errorMessage = "⚠️ Invalid API credentials.";
+        errorMessage = "Invalid API credentials.";
       }
       if (frappeResponse.status === 403 && usingSession) {
-        errorMessage = "⚠️ Your session has expired. Please reconnect in Settings.";
+        errorMessage = "Your session has expired. Please reconnect in Settings.";
       }
 
       return json({ success: false, error: errorMessage, action: "QUERY", doctype: plan.doctype });
@@ -563,7 +590,9 @@ Generate a clear, concise, human-readable answer based on the data.
 
 Rules:
 - Be conversational and helpful
-- Use markdown formatting for readability
+- Use simple markdown formatting for readability (bold, bullet lists) — no tables, no horizontal rules
+- No emoji, anywhere, for any reason
+- No double spaces
 - For counts, state the number clearly
 - For lists, format as a numbered or bulleted list with key details
 - For totals/sums, calculate and present the result
