@@ -58,7 +58,7 @@ const DownloadButtons = ({ data, doctype }: { data: any[]; doctype?: string }) =
   );
 };
 
-const DataTable = ({ data, doctype }: { data: any[]; doctype?: string }) => {
+const DataTable = ({ data, doctype, showDownload }: { data: any[]; doctype?: string; showDownload?: boolean }) => {
   if (data.length === 0) return <p className="text-sm text-muted-foreground italic">No records found.</p>;
   const keys = Object.keys(data[0]).filter((k) => !k.startsWith("_"));
   return (
@@ -90,7 +90,7 @@ const DataTable = ({ data, doctype }: { data: any[]; doctype?: string }) => {
           {data.length} record{data.length !== 1 ? "s" : ""}
         </div>
       </div>
-      <DownloadButtons data={data} doctype={doctype} />
+      {showDownload && <DownloadButtons data={data} doctype={doctype} />}
     </div>
   );
 };
@@ -415,7 +415,9 @@ const ResultCard = ({
           </div>
         )}
         {result.action === "CROSS_CHECK" && <CrossCheckView crossCheck={result.crossCheck} />}
-        {result.data && Array.isArray(result.data) && <DataTable data={result.data} doctype={result.doctype} />}
+        {result.data && Array.isArray(result.data) && (
+          <DataTable data={result.data} doctype={result.doctype} showDownload={!!result.exportFormat} />
+        )}
         {result.data && !Array.isArray(result.data) && typeof result.data === "object" && (
           <DataObject data={result.data} />
         )}
