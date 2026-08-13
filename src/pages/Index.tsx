@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import { Bot, Sun, Moon, MessageSquare, Plus, Home, User, ArrowRight, Sparkles } from "lucide-react";
+import { Bot, Sun, Moon, MessageSquare, Plus, Home, ArrowRight, Sparkles, Search, UserPlus, CalendarClock, FileUp } from "lucide-react";
 import { toast } from "sonner";
 import { useTheme } from "@/hooks/useTheme";
 import { useChatStore, type ChatMessage, type UploadedFileData, type ImportPreviewData, type ImportExecuteResult, type WritePreviewData, type WriteExecuteResult } from "@/hooks/useChatStore";
@@ -249,10 +249,10 @@ const Index = () => {
   // Home page: nav, hero, and a live-looking preview of the product itself.
   if (!started) {
     const examples = [
-      "How many employees are in my system?",
-      "Create a new employee named Priya Sharma",
-      "Show pending leave applications",
-      "Import my employees from a CSV",
+      { icon: Search, label: "Query records", prompt: "How many employees are in my system?" },
+      { icon: UserPlus, label: "Create employee", prompt: "Create a new employee named Priya Sharma" },
+      { icon: CalendarClock, label: "Leave requests", prompt: "Show pending leave applications" },
+      { icon: FileUp, label: "Bulk import", prompt: "Import my employees from a CSV" },
     ];
 
     return (
@@ -308,63 +308,55 @@ const Index = () => {
           </div>
         </section>
 
-        {/* Live-looking product preview */}
+        {/* Prompt-builder preview, gradient-framed like a command console */}
         <section className="mx-auto max-w-2xl px-6 pb-14">
-          <div className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-6">
-            <div className="mb-4 flex items-center justify-between">
-              <span className="text-[11px] font-medium text-muted-foreground">Live preview</span>
-              <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
-                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                Example
-              </span>
-            </div>
+          <div className="rounded-[28px] bg-gradient-to-br from-indigo-500/20 via-sky-400/15 to-fuchsia-400/20 p-2">
+            <div className="rounded-3xl border border-border/60 bg-card p-5 shadow-sm sm:p-7">
+              <div className="mb-4 flex items-center justify-between">
+                <span className="text-[11px] font-medium text-muted-foreground">Ask Copilot anything</span>
+                <span className="inline-flex items-center gap-1 rounded-full bg-indigo-500/10 px-2 py-0.5 text-[10px] font-medium text-indigo-600 dark:text-indigo-400">
+                  <span className="h-1.5 w-1.5 rounded-full bg-indigo-500" />
+                  Answers in seconds
+                </span>
+              </div>
 
-            {/* mock user message */}
-            <div className="flex flex-row-reverse items-start gap-2.5">
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                <User className="h-3.5 w-3.5" />
-              </div>
-              <div className="rounded-2xl rounded-br-md bg-primary px-3.5 py-2 text-xs text-primary-foreground">
-                How many employees are in my system?
-              </div>
-            </div>
+              <p className="text-sm leading-relaxed text-foreground sm:text-base">
+                Show me every{" "}
+                <span className="rounded-md bg-indigo-500/10 px-1.5 py-0.5 font-medium text-indigo-600 dark:text-indigo-400">
+                  [Employee]
+                </span>{" "}
+                in{" "}
+                <span className="rounded-md bg-fuchsia-500/10 px-1.5 py-0.5 font-medium text-fuchsia-600 dark:text-fuchsia-400">
+                  [Production]
+                </span>{" "}
+                whose{" "}
+                <span className="rounded-md bg-sky-500/10 px-1.5 py-0.5 font-medium text-sky-600 dark:text-sky-400">
+                  [leave balance]
+                </span>{" "}
+                is under{" "}
+                <span className="rounded-md bg-amber-500/10 px-1.5 py-0.5 font-medium text-amber-600 dark:text-amber-400">
+                  [5 days]
+                </span>
+                , then create a[n]{" "}
+                <span className="rounded-md bg-emerald-500/10 px-1.5 py-0.5 font-medium text-emerald-600 dark:text-emerald-400">
+                  [Leave Application]
+                </span>{" "}
+                for each one.
+              </p>
 
-            {/* mock agent response */}
-            <div className="mt-3 flex items-start gap-2.5">
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                <Bot className="h-3.5 w-3.5" />
-              </div>
-              <div className="max-w-[85%] space-y-2">
-                <div className="rounded-2xl rounded-bl-md bg-[hsl(var(--chat-agent))] px-3.5 py-2 text-xs text-[hsl(var(--chat-agent-foreground))]">
-                  There are 8 employees in your system.
-                </div>
-                <div className="overflow-hidden rounded-lg border border-border">
-                  <table className="w-full text-[10px]">
-                    <thead>
-                      <tr className="border-b border-border bg-muted/50">
-                        <th className="px-2.5 py-1.5 text-left font-mono font-normal text-muted-foreground">name</th>
-                        <th className="px-2.5 py-1.5 text-left font-mono font-normal text-muted-foreground">employee name</th>
-                        <th className="px-2.5 py-1.5 text-left font-mono font-normal text-muted-foreground">department</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {[
-                        ["HR-EMP-00002", "Ravi", "Production - E"],
-                        ["HR-EMP-00003", "Priya", "Production - E"],
-                        ["HR-EMP-00010", "Vikram", "Production - E"],
-                      ].map((row) => (
-                        <tr key={row[0]} className="border-b border-border/50 last:border-0">
-                          {row.map((cell, i) => (
-                            <td key={i} className="px-2.5 py-1.5 font-mono text-muted-foreground">{cell}</td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  <div className="border-t border-border bg-muted/30 px-2.5 py-1 text-[9px] text-muted-foreground">
-                    8 records
-                  </div>
-                </div>
+              <div className="mt-5 flex items-center justify-between gap-3">
+                <span className="text-[11px] text-muted-foreground">Works on any doctype you have access to</span>
+                <button
+                  onClick={() =>
+                    openWithPrompt(
+                      "Show me every employee in Production whose leave balance is under 5 days"
+                    )
+                  }
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-foreground px-4 py-2 text-xs font-medium text-background hover:opacity-90 transition-opacity"
+                >
+                  Try it
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </button>
               </div>
             </div>
           </div>
@@ -373,11 +365,12 @@ const Index = () => {
           <div className="mt-4 flex flex-wrap justify-center gap-2">
             {examples.map((ex) => (
               <button
-                key={ex}
-                onClick={() => openWithPrompt(ex)}
-                className="rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground hover:border-primary/40 hover:text-foreground transition-colors"
+                key={ex.label}
+                onClick={() => openWithPrompt(ex.prompt)}
+                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground hover:border-primary/40 hover:text-foreground transition-colors"
               >
-                {ex}
+                <ex.icon className="h-3.5 w-3.5" />
+                {ex.label}
               </button>
             ))}
           </div>
