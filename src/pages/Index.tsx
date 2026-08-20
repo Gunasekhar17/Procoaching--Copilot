@@ -193,6 +193,7 @@ const Index = () => {
           status: data.status,
           results: data.results,
           exportFormat: data.exportFormat,
+          aggregate: data.aggregate,
           importPreview,
           crossCheck: data.crossCheck,
           writePreview: data.writePreview,
