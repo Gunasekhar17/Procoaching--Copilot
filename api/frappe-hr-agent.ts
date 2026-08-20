@@ -624,12 +624,13 @@ ${JSON.stringify(rawData, null, 2).slice(0, 4000)}`,
       }
     }
 
-      return json({
+    return json({
       success: true,
       action: "QUERY",
       doctype: plan.doctype,
       summary: humanAnswer,
       data: rawData,
+      aggregate: plan.aggregate || "list",
       exportFormat: plan.export_format && plan.export_format !== "none" ? plan.export_format : undefined,
     });
   } catch (e) {
