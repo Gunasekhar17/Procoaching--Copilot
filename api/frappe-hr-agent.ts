@@ -582,6 +582,8 @@ If you can't determine what data to query or how to map the file, set action to 
     const rawData = responseData?.data;
 
     // ============ AI generates a human-readable answer ============
+    const exportRequested = !!plan.export_format && plan.export_format !== "none";
+
     const answerMessages: ChatMessage[] = [
       {
         role: "system",
@@ -599,7 +601,12 @@ Rules:
 - If no data was found, say so helpfully
 - Include relevant details but don't dump raw JSON
 - Keep currency values formatted nicely
-- Keep it concise — no more than a few paragraphs`,
+- Keep it concise — no more than a few paragraphs${
+          exportRequested
+            ? `
+- The user explicitly asked for this as a downloadable ${plan.export_format?.toUpperCase()} file. The app is already generating and downloading that file automatically — you do not create it and must never say you can't generate or export files, because you're not being asked to and the app already does this. Your only job here is a short 1-2 sentence acknowledgment (e.g. "Here are all ${Array.isArray(rawData) ? rawData.length : ""} ${plan.doctype} records, downloaded as a ${plan.export_format?.toUpperCase()} file."). Do NOT list out individual records or their field values in this answer — the file already contains all of that, repeating it in the chat is redundant.`
+            : ""
+        }`,
       },
       {
         role: "user",
