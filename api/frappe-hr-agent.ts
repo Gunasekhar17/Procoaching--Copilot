@@ -178,7 +178,7 @@ PERMISSIONS: You can create and update records — every write is only ever plan
 
 RESPONSE FORMATTING (applies to every "summary" you write, and to the final answer text): plain, clean prose or simple markdown only. No emoji, anywhere, for any reason. No markdown horizontal rules (no lines of just dashes or equals signs). No table syntax with dash separator rows — if you want to show a small structured comparison, use a short bullet list instead. No double spaces. Keep it concise and conversational, the way a helpful colleague would write in chat, not like a formatted document.
 
-COMMON QUERY PATTERNS (for QUERY):
+COMMON QUERY PATTERNS (for QUERY): the "aggregate" field is REQUIRED on every QUERY action — always include it, never leave it out.
 - "how many" → aggregate: "count"
 - "total/sum of" → aggregate: "sum", specify aggregate_field
 - "list/show/what are" → aggregate: "list"
@@ -624,13 +624,26 @@ ${JSON.stringify(rawData, null, 2).slice(0, 4000)}`,
       }
     }
 
+    // The AI decides "aggregate" per request, and won't always fill it in.
+    // Default the missing/unrecognized case to "none" (no table) rather than
+    // "list" (shows a table) — an unwanted extra table is worse than a
+    // plain-text-only answer. A single named-document lookup (plan.name was
+    // set, so this fetched exactly one record by ID) is never a "list" no
+    // matter what the model said, so that's forced regardless.
+    const validAggregates = ["count", "sum", "list", "none"];
+    const resolvedAggregate = plan.name
+      ? "none"
+      : validAggregates.includes(plan.aggregate)
+      ? plan.aggregate
+      : "none";
+
     return json({
       success: true,
       action: "QUERY",
       doctype: plan.doctype,
       summary: humanAnswer,
       data: rawData,
-      aggregate: plan.aggregate || "list",
+      aggregate: resolvedAggregate,
       exportFormat: plan.export_format && plan.export_format !== "none" ? plan.export_format : undefined,
     });
   } catch (e) {
