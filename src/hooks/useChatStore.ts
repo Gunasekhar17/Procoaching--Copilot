@@ -108,6 +108,7 @@ export interface AgentResultData {
   };
   codeGen?: CodeGenData;
   exportFormat?: "csv" | "xlsx" | "none";
+  aggregate?: "count" | "sum" | "list" | "none";
   importPreview?: ImportPreviewData;
   importResult?: ImportExecuteResult;
   crossCheck?: CrossCheckData;
