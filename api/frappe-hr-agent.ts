@@ -1,6 +1,7 @@
 import { corsHeaders, json } from "./_lib/cors";
 import { callClaude, firstToolCallArgs, messageText, ClaudeError, type ChatMessage } from "./_lib/anthropic";
 import { isRestrictedDoctype } from "./_lib/permissions";
+import { isHrDoctype, outOfScopeError } from "./_lib/hrScope";
 
 export const config = { runtime: "edge" };
 
@@ -10,13 +11,11 @@ interface UploadedFile {
   rows: Record<string, any>[];
 }
 
-// Fetches every DocType the connected user can read, across every
-// installed app/module and every business area — Sales, Purchase, Stock,
-// Accounts, Projects, Support, Manufacturing, CRM, HR, etc. This mirrors
-// Frappe's own permission system exactly: whatever DocTypes come back for
-// these credentials is whatever this user/API key is allowed to see, and
-// none of it is filtered out here — if their Frappe permissions cover
-// everything, this assistant can work with everything too.
+// Fetches every DocType the connected user can read, THEN narrows that down
+// to the standard Frappe HR (HRMS) doctype set (see _lib/hrScope.ts). This
+// app is HR-only, so the model should never even see Sales/Purchase/Stock/
+// Accounts/CRM/etc. doctypes as candidates — the catalog it's given is the
+// intersection of "what this user can access" and "what's actually HR".
 // (istable/issingle are excluded because those are child-table rows and
 // single-record settings doctypes, which the QUERY action isn't built to
 // list/count/sum the way it does normal doctypes — not a permission cut.)
@@ -34,7 +33,7 @@ async function fetchDoctypeCatalog(baseUrl: string, authHeaders: Record<string, 
 
     const byModule = new Map<string, string[]>();
     for (const r of rows) {
-      if (!r.module) continue;
+      if (!r.module || !isHrDoctype(r.name)) continue;
       if (!byModule.has(r.module)) byModule.set(r.module, []);
       byModule.get(r.module)!.push(r.name);
     }
@@ -42,9 +41,7 @@ async function fetchDoctypeCatalog(baseUrl: string, authHeaders: Record<string, 
       .map(([mod, names]) => `${mod}: ${names.join(", ")}`)
       .join("\n");
   } catch {
-    return ""; // fall back to the AI's general Frappe/ERPNext knowledge
-  }
-}
+    return ""; // fall back to the AI's general Frappe HR knowledge
 
 
 // Frappe GET requests have URL length limits, so when matching a large set of
