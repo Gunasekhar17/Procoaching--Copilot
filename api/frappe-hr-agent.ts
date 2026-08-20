@@ -170,7 +170,7 @@ ACTIONS you can choose:
 - "CLARIFY": you need more detail before you can act. Ask in "summary". Only use this when the information is truly required and missing — don't ask about things you can reasonably infer or default.
 - "CROSS_CHECK": only when a file is attached. Compare the uploaded file's rows against existing Frappe records to find mismatches or records missing from Frappe. Read-only — does not change any data.
 - "IMPORT_PLAN": the user wants to create and/or update MULTIPLE Frappe records at once — either from an attached file, OR from a list of records they typed/pasted directly into the chat (this turn or an earlier one in the conversation). This only PLANS the batch (no writes happen yet) — the user reviews one combined summary and confirms once for the whole batch, not once per record.
-- "WRITE_PLAN": the user wants to create ONE new record, or update ONE existing record (e.g. "add a new employee named Priya Sharma in Engineering", "create a sales order for Acme Corp", "set John's designation to Manager"). This only PLANS the write (nothing is saved yet) — a confirmation step happens after.
+- "WRITE_PLAN": the user wants to create ONE new record, or update ONE existing record (e.g. "add a new employee named Priya Sharma in Engineering", "create a sales order for Acme Corp", "set John's designation to Manager", "change Lakshmi's gender to Male", "update Priya's department to Sales"). This only PLANS the write (nothing is saved yet) — a confirmation step happens after. If the user's message names a specific field and a new value they want it set to — "change/update/set X's FIELD to VALUE" in any phrasing — that is ALWAYS WRITE_PLAN, never QUERY, even if you're not yet sure which exact record they mean. Resolving that is WRITE_PLAN's own job (via lookup_field/lookup_value below, which searches for you) — never substitute a QUERY lookup instead and just describe the record's current value back to them, and never tell the user you can only look up data when they've asked for a change.
 
 RECOGNIZING PASTED BULK DATA: If the user's message (or a recent message earlier in this conversation) contains a table or list describing MULTIPLE records — even if it's just plain text copy-pasted from a spreadsheet, with columns run together by spaces rather than neatly delimited — treat this as IMPORT_PLAN, not as repeated WRITE_PLAN calls for one record at a time. Use the column headers mentioned anywhere in the conversation to figure out what each value in each row means. Extract every row into "inline_rows" (see below) in a single response, so the user gets one preview and one confirmation for the entire batch. If the user says something like "create for remaining also" or "do the rest", look back through the conversation for the full original list and continue from where the earlier ones already covered — don't just repeat the first record again.
 
@@ -588,7 +588,7 @@ If you can't determine what data to query or how to map the file, set action to 
       {
         role: "system",
         content: `You are the Frappe Copilot. The user asked a question and we fetched data from their Frappe site.
-Generate a clear, concise, human-readable answer based on the data.
+Generate a clear, concise, human-readable answer based on the data below.
 
 Rules:
 - Be conversational and helpful
@@ -601,7 +601,8 @@ Rules:
 - If no data was found, say so helpfully
 - Include relevant details but don't dump raw JSON
 - Keep currency values formatted nicely
-- Keep it concise — no more than a few paragraphs${
+- Keep it concise — no more than a few paragraphs
+- Only describe the data shown to you below. Never comment on whether this app can create, update, change, or edit records, in either direction — that is completely outside what you're being asked here, an earlier step already decided how to handle the request, and this app can in fact create and update records. If the "Question" mentions wanting to change or set a value, just answer factually with what the data currently shows and stop there — do not add any disclaimer, suggestion, or instructions about updating it yourself.${
           exportRequested
             ? `
 - The user explicitly asked for this as a downloadable ${plan.export_format?.toUpperCase()} file. The app is already generating and downloading that file automatically — you do not create it and must never say you can't generate or export files, because you're not being asked to and the app already does this. Your only job here is a short 1-2 sentence acknowledgment (e.g. "Here are all ${Array.isArray(rawData) ? rawData.length : ""} ${plan.doctype} records, downloaded as a ${plan.export_format?.toUpperCase()} file."). Do NOT list out individual records or their field values in this answer — the file already contains all of that, repeating it in the chat is redundant.`
