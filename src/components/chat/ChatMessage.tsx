@@ -387,9 +387,33 @@ const ResultCard = ({
     return <ImportConfirmationCard preview={result.importPreview as ImportPreviewData & { rows: Record<string, any>[] }} onConfirm={onConfirmImport} />;
   }
 
-  if (result.action === "WRITE_PLAN" && result.writePreview) {
+    if (result.action === "WRITE_PLAN" && result.writePreview) {
     return <WriteConfirmationCard preview={result.writePreview} onConfirm={onConfirmWrite} />;
   }
+
+  // QUERY: the chat bubble text is already the full answer. Only add a
+  // table underneath when the question actually asked to see a list/table
+  // (aggregate === "list") — for a count, a sum, or a single-record lookup,
+  // showing a table too would just repeat the same answer a second time.
+  if (result.action === "QUERY") {
+    if (result.error) {
+      return (
+        <div className="mt-2 rounded-lg border border-destructive/20 overflow-hidden">
+          <div className="p-3">
+            <div className="rounded-md bg-destructive/10 px-3 py-2">
+              <p className="text-sm text-destructive font-mono whitespace-pre-wrap">{result.error}</p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    if (result.aggregate === "list" && Array.isArray(result.data)) {
+      return <DataTable data={result.data} doctype={result.doctype} showDownload={!!result.exportFormat} />;
+    }
+    return null;
+  }
+
+  
 
   return (
     <div className={`mt-2 rounded-lg border ${result.success ? "border-success/20" : "border-destructive/20"} overflow-hidden`}>
