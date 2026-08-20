@@ -624,7 +624,7 @@ ${JSON.stringify(rawData, null, 2).slice(0, 4000)}`,
       }
     }
 
-    return json({
+      return json({
       success: true,
       action: "QUERY",
       doctype: plan.doctype,
